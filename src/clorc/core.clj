@@ -1,4 +1,5 @@
 (ns clorc.core
+  (:require [clorc.extractor :as e])
   (:import (org.apache.orc OrcFile RecordReader Reader)
            (org.apache.hadoop.fs Path FileSystem)
            (org.apache.hadoop.hive.ql.exec.vector VectorizedRowBatch BytesColumnVector ColumnVector)))
@@ -8,23 +9,24 @@
   [x]
   (println x "Hello, World!"))
 
+(defn ^ColumnVector find-col
+  [index cols]
+  (nth cols index))
+
 (defn make-reader [conf path]
-  (let [reader
-        (OrcFile/createReader
-          (Path. path)
-          (-> (OrcFile/readerOptions conf)
-              (.filesystem (FileSystem/getLocal conf))))
-        batch
-        ^VectorizedRowBatch (-> reader
-                                .getSchema
-                                .createRowBatch)]
-    (println (.numCols batch))
-    (println (.nextBatch (.rows reader) batch))
-    (println (.size batch))
-    reader))
+  (OrcFile/createReader
+    (Path. path)
+    (-> (OrcFile/readerOptions conf)
+        (.filesystem (FileSystem/getLocal conf)))))
 
 
-(defn read-all [reader]
+(defn orc-seq [reader & cols]
+
+  )
+
+(defn orc-scan
+  "should be lazy and not in memory"
+  [reader]
   (let [rows ^RecordReader (.rows reader)
         batch
         ^VectorizedRowBatch (-> reader
@@ -32,6 +34,7 @@
                                 .createRowBatch)
         cols (.-cols batch)
         items (atom [])]
+    (println cols)
     (while (.nextBatch rows batch)
       (doall
         (map
@@ -39,17 +42,10 @@
             (swap! items conj (into []
                                     (map
                                       (fn [^ColumnVector col]
-                                        (try
-                                          (-> col
-                                              (.-vector)
-                                              (nth index)
-                                              (.toString))
-                                          (catch Exception e
-                                            "NOT_SUPPORTED")))
+                                        (e/extract col index))
                                       cols)))
             )
           (range 0 (.size batch)))))
     (.close rows)
-    @items)
-  )
+    @items))
 
