@@ -16,7 +16,6 @@ your option) any later version.
 
 ## Todo
 
-- column names
 - more column types
 - handle repeating values
 - writer interface
