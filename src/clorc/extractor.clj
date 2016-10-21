@@ -21,10 +21,11 @@
   (extract [v i] "List")
   MapColumnVector
   (extract [cv i]
-    (zipmap
-      (extract (.-keys cv) 0)
-      (extract (.-values cv) 0))
-    )
+    ;(zipmap
+    ;  (extract (.-keys cv) 0)
+    ;  (extract (.-values cv) 0))
+    ;
+    "Map")
   )
 ;
 ;

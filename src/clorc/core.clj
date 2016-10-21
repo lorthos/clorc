@@ -1,13 +1,10 @@
 (ns clorc.core
   (:require [clorc.extractor :as e])
-  (:import (org.apache.orc OrcFile RecordReader Reader)
+  (:import (org.apache.orc OrcFile RecordReader)
            (org.apache.hadoop.fs Path FileSystem)
-           (org.apache.hadoop.hive.ql.exec.vector VectorizedRowBatch BytesColumnVector ColumnVector)))
+           (org.apache.hadoop.hive.ql.exec.vector VectorizedRowBatch ColumnVector)
+           (java.util Iterator)))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
 
 (defn ^ColumnVector find-col
   [index cols]
@@ -20,32 +17,45 @@
         (.filesystem (FileSystem/getLocal conf)))))
 
 
-(defn orc-seq [reader & cols]
-
-  )
-
-(defn orc-scan
-  "should be lazy and not in memory"
-  [reader]
+(defn orc->seq [reader]
   (let [rows ^RecordReader (.rows reader)
-        batch
-        ^VectorizedRowBatch (-> reader
+
+        current-batch (atom ^VectorizedRowBatch
+                            (-> reader
                                 .getSchema
-                                .createRowBatch)
-        cols (.-cols batch)
-        items (atom [])]
-    (println cols)
-    (while (.nextBatch rows batch)
-      (doall
-        (map
-          (fn [index]
-            (swap! items conj (into []
-                                    (map
-                                      (fn [^ColumnVector col]
-                                        (e/extract col index))
-                                      cols)))
-            )
-          (range 0 (.size batch)))))
-    (.close rows)
-    @items))
+                                .createRowBatch))
+
+        current-col-index (atom 0)
+        current-row (atom nil)
+        hasNext? (atom (<= 0 (.size @current-batch)))
+        ]
+    (.nextBatch rows @current-batch)
+    (filter
+      (complement nil?)
+      (iterator-seq
+        (reify Iterator
+          (hasNext [this] @hasNext?)
+          (next [this]
+            (do
+              (if (and
+                    (< 0 (.size @current-batch))
+                    (< @current-col-index (.size @current-batch)))
+                (do
+                  (reset!
+                    current-row
+                    (into []
+                          (map
+                            (fn [^ColumnVector col]
+                              (e/extract col @current-col-index))
+                            (.-cols @current-batch))))
+                  (swap! current-col-index inc))
+                (do
+                  (.nextBatch rows @current-batch)
+                  (if (< 0 (.size @current-batch))
+                    (reset! current-col-index 0)
+                    (reset! hasNext? false))))
+              (if (< 0 (.size @current-batch))
+                @current-row
+                nil))))))))
+
 
