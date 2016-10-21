@@ -16,6 +16,20 @@
     (-> (OrcFile/readerOptions conf)
         (.filesystem (FileSystem/getLocal conf)))))
 
+(defn get-field-names
+  [^RecordReader reader]
+  (-> reader
+      .getSchema
+      .getFieldNames))
+
+(defn get-field-types
+  [^RecordReader reader]
+  (map #(-> %
+            .getCategory
+            .getName)
+       (-> reader
+           .getSchema
+           .getChildren)))
 
 (defn orc->seq [reader]
   (let [rows ^RecordReader (.rows reader)
@@ -28,6 +42,8 @@
         current-col-index (atom 0)
         current-row (atom nil)
         hasNext? (atom (<= 0 (.size @current-batch)))
+        names (get-field-names reader)
+        types (get-field-types reader)
         ]
     (.nextBatch rows @current-batch)
     (filter
@@ -43,11 +59,16 @@
                 (do
                   (reset!
                     current-row
-                    (into []
-                          (map
-                            (fn [^ColumnVector col]
-                              (e/extract col @current-col-index))
-                            (.-cols @current-batch))))
+                    (zipmap
+                      names
+                      (into []
+                            (map
+                              (fn [^ColumnVector col]
+                                (e/extract col @current-col-index
+                                           (nth types
+                                                @current-col-index)))
+                              (.-cols @current-batch))))
+                    )
                   (swap! current-col-index inc))
                 (do
                   (.nextBatch rows @current-batch)

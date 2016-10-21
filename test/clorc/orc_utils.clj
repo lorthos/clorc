@@ -20,7 +20,7 @@
             (swap! items conj (into []
                                     (map
                                       (fn [^ColumnVector col]
-                                        (e/extract col index))
+                                        (e/extract col index nil))
                                       cols)))
             )
           (range 0 (.size batch)))))

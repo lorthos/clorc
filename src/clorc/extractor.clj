@@ -2,25 +2,38 @@
   (:import (org.apache.hadoop.hive.ql.exec.vector ColumnVector BytesColumnVector DecimalColumnVector StructColumnVector LongColumnVector DoubleColumnVector ListColumnVector MapColumnVector)))
 
 (defprotocol VectorItem
-  (extract [^ColumnVector v index]))
+  (extract [^ColumnVector v index type-str]))
 
+(defn getv [^ColumnVector cv index]
+  (nth (.-vector cv) index))
 
 ; protocols can be extended to existing types and user defined types
 (extend-protocol VectorItem
   BytesColumnVector
-  (extract [v i] "bytes")
+  (extract [cv i type-str]
+    (println type-str)
+    (if (nil? type-str)
+      "bytes"
+      (if (= type-str "boolean")
+        (= (nth (getv cv i) 0) 1)
+        "bytes")))
   DecimalColumnVector
-  (extract [cv i] (nth (.-vector cv) i))
+  (extract [cv i type-str]
+    (getv cv i))
   StructColumnVector
-  (extract [v i] "Struct")
+  (extract [v i type-str]
+    "Struct")
   LongColumnVector
-  (extract [cv i] (nth (.-vector cv) i))
+  (extract [cv i type-str]
+    (getv cv i))
   DoubleColumnVector
-  (extract [cv i] (nth (.-vector cv) i))
+  (extract [cv i type-str]
+    (getv cv i))
   ListColumnVector
-  (extract [v i] "List")
+  (extract [cv i type-str]
+    "List")
   MapColumnVector
-  (extract [cv i]
+  (extract [cv i type-str]
     ;(zipmap
     ;  (extract (.-keys cv) 0)
     ;  (extract (.-values cv) 0))
