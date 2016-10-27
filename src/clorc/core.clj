@@ -18,9 +18,10 @@
 
 (defn get-field-names
   [^RecordReader reader]
-  (-> reader
-      .getSchema
-      .getFieldNames))
+  (map keyword
+       (-> reader
+           .getSchema
+           .getFieldNames)))
 
 (defn get-field-types
   [^RecordReader reader]
